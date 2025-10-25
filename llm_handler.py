@@ -27,7 +27,10 @@ class GroqHandler:
         self.base_url = "https://api.groq.com/openai/v1/chat/completions"
         
         if not self.api_key:
-            raise ValueError("Groq API key is required. Set GROQ_API_KEY environment variable.")
+            raise ValueError(
+                "Groq API key is required. Please set GROQ_API_KEY environment variable or create a .env file. "
+                "Get your API key from: https://console.groq.com/keys"
+            )
     
     def _construct_multilingual_prompt(self, query: str, context_chunks: List[Dict[str, Any]], language: str) -> str:
         """

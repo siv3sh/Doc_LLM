@@ -31,6 +31,18 @@ if "document_uploaded" not in st.session_state:
 st.title("🌏 South Indian Multilingual Document QA Chatbot")
 st.markdown("Upload documents in **Malayalam, Tamil, Telugu, Kannada, or Tulu** and ask questions!")
 
+# Check API key status
+api_key_status = os.getenv('GROQ_API_KEY')
+if not api_key_status:
+    st.warning("⚠️ **API Key Required**: Please set your GROQ_API_KEY environment variable or create a `.env` file")
+    st.info("💡 **Quick Setup:**\n"
+           "1. Get your API key from: https://console.groq.com/keys\n"
+           "2. Copy `env.example` to `.env`\n"
+           "3. Replace `your_groq_api_key_here` with your actual API key\n"
+           "4. Restart the application")
+else:
+    st.success("✅ **API Key Configured**: Ready to process documents!")
+
 # Sidebar for file upload
 with st.sidebar:
     st.header("📄 Document Upload")
@@ -67,7 +79,16 @@ with st.sidebar:
                     
                     # Initialize Groq handler if not already done
                     if st.session_state.groq_handler is None:
-                        st.session_state.groq_handler = GroqHandler()
+                        try:
+                            st.session_state.groq_handler = GroqHandler()
+                        except ValueError as e:
+                            st.error(f"❌ {str(e)}")
+                            st.info("💡 **How to fix:**\n"
+                                   "1. Get your API key from: https://console.groq.com/keys\n"
+                                   "2. Create a `.env` file in the project directory\n"
+                                   "3. Add: `GROQ_API_KEY=your_actual_api_key_here`\n"
+                                   "4. Restart the application")
+                            st.stop()
                     
                     # Process and store document
                     with st.spinner("Embedding and storing document..."):

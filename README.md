@@ -106,6 +106,8 @@ GROQ_API_KEY=your_actual_groq_api_key
 QDRANT_URL=http://localhost:6333  # or your cloud URL
 ```
 
+**⚠️ Important**: Replace `your_groq_api_key_here` with your actual Groq API key from [Groq Console](https://console.groq.com/keys)
+
 ### 5. Run the Application
 
 ```bash
@@ -190,21 +192,32 @@ doc_llm/
 
 ### Common Issues
 
-1. **"ModuleNotFoundError: No module named 'utils'"**
+1. **"Groq API key is required"** ❌
+   - **Solution**: Create a `.env` file with your API key
+   - **Steps**: 
+     ```bash
+     cp env.example .env
+     # Edit .env and replace your_groq_api_key_here with your actual key
+     ```
+   - **Verify**: Check that `.env` file exists and contains `GROQ_API_KEY=your_actual_key`
+
+2. **"ModuleNotFoundError: No module named 'utils'"**
    - Ensure all files are in the same directory
    - Check Python path
-
-2. **"Groq API key is required"**
-   - Set `GROQ_API_KEY` in your `.env` file
-   - Verify API key is valid
 
 3. **"Connection to Qdrant failed"**
    - Ensure Qdrant is running on the specified URL
    - Check firewall settings
+   - **Note**: App will automatically use in-memory storage if Qdrant is unavailable
 
 4. **"Language detection failed"**
-   - Ensure document has sufficient text (>50 characters)
+   - Ensure document has sufficient text (>20 characters)
    - Check if language is supported
+
+5. **"Could not extract sufficient text from the document"**
+   - Try a different PDF format
+   - Ensure the PDF contains readable text (not just images)
+   - Check if the document is corrupted
 
 ### Performance Optimization
 
