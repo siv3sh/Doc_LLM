@@ -4,6 +4,7 @@ Handles text extraction, language detection, and text cleaning.
 """
 
 import os
+import tempfile
 import re
 import pdfplumber
 import docx2txt
@@ -153,10 +154,11 @@ def extract_from_docx(file) -> str:
     # Reset file pointer
     file.seek(0)
     
-    # Save temporary file
-    temp_path = f"temp_{file.name}"
-    with open(temp_path, "wb") as f:
-        f.write(file.getbuffer())
+    # Save temporary file in a writable temp directory (works on Streamlit Cloud)
+    tmp_dir = tempfile.gettempdir()
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx", dir=tmp_dir) as tmp:
+        temp_path = tmp.name
+        tmp.write(file.getbuffer())
     
     try:
         text = docx2txt.process(temp_path)
