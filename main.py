@@ -43,8 +43,31 @@ if not api_key_status:
 else:
     st.success("✅ **API Key Configured**: Ready to process documents!")
 
-# Sidebar for file upload
+<<<<<<< HEAD
 with st.sidebar:
+    st.header("🔐 API Settings")
+    api_key_input = st.text_input(
+        "Groq API Key",
+        type="password",
+        value=os.getenv('GROQ_API_KEY') or "",
+        help="Provide your Groq API key to enable answer generation"
+    )
+    if st.button("Apply API Key"):
+        if api_key_input and api_key_input.strip():
+            os.environ['GROQ_API_KEY'] = api_key_input.strip()
+            # Recreate or update handler
+            try:
+                if st.session_state.groq_handler is None:
+                    st.session_state.groq_handler = GroqHandler(api_key=api_key_input.strip())
+                else:
+                    st.session_state.groq_handler.api_key = api_key_input.strip()
+                st.success("✅ API key applied")
+            except ValueError as e:
+                st.error(f"❌ {str(e)}")
+        else:
+            st.warning("Please enter a valid API key")
+
+    st.markdown("---")
     st.header("📄 Document Upload")
     
     uploaded_file = st.file_uploader(
@@ -80,14 +103,14 @@ with st.sidebar:
                     # Initialize Groq handler if not already done
                     if st.session_state.groq_handler is None:
                         try:
-                            st.session_state.groq_handler = GroqHandler()
+                            # Use applied API key if present, else fall back to env
+                            st.session_state.groq_handler = GroqHandler(api_key=os.getenv('GROQ_API_KEY'))
                         except ValueError as e:
                             st.error(f"❌ {str(e)}")
                             st.info("💡 **How to fix:**\n"
-                                   "1. Get your API key from: https://console.groq.com/keys\n"
-                                   "2. Create a `.env` file in the project directory\n"
-                                   "3. Add: `GROQ_API_KEY=your_actual_api_key_here`\n"
-                                   "4. Restart the application")
+                                   "1. Enter your API key in the sidebar 'API Settings' and click Apply\n"
+                                   "2. Or create a `.env` file with GROQ_API_KEY set\n"
+                                   "3. Then re-upload the document")
                             st.stop()
                     
                     # Process and store document
