@@ -8,6 +8,20 @@ from llm_handler import GroqHandler
 # Load environment variables
 load_dotenv()
 
+# Streamlit Cloud: load secrets if provided
+try:
+    if hasattr(st, 'secrets') and st.secrets:  # type: ignore[attr-defined]
+        if 'GROQ_API_KEY' in st.secrets:
+            os.environ['GROQ_API_KEY'] = st.secrets['GROQ_API_KEY']
+        if 'GROQ_MODEL' in st.secrets:
+            os.environ['GROQ_MODEL'] = st.secrets['GROQ_MODEL']
+        if 'QDRANT_URL' in st.secrets:
+            os.environ['QDRANT_URL'] = st.secrets['QDRANT_URL']
+        if 'QDRANT_COLLECTION_NAME' in st.secrets:
+            os.environ['QDRANT_COLLECTION_NAME'] = st.secrets['QDRANT_COLLECTION_NAME']
+except Exception:
+    pass
+
 # Page configuration
 st.set_page_config(
     page_title="South Indian Multilingual QA Chatbot",
