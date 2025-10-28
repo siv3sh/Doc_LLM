@@ -8,7 +8,7 @@ import re
 import pdfplumber
 import docx2txt
 from langdetect import detect, DetectorFactory
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple
 
 # Set seed for consistent language detection
 DetectorFactory.seed = 0
@@ -107,6 +107,46 @@ def extract_from_pdf(file) -> str:
         except Exception as e2:
             print(f"Alternative PDF extraction also failed: {e2}")
             raise Exception(f"Could not extract text from PDF: {e}")
+
+def get_language_distribution(file) -> Dict[str, int]:
+    """Compute language distribution in a document. For PDFs, detects per-page languages.
+    For DOCX/TXT, detects language once for the whole document.
+
+    Args:
+        file: Streamlit uploaded file object
+
+    Returns:
+        Dict[str, int]: Mapping of language code to count (pages for PDF, 1 for others)
+    """
+    try:
+        extension = file.name.split('.')[-1].lower()
+        counts: Dict[str, int] = {}
+        if extension == 'pdf':
+            file.seek(0)
+            try:
+                with pdfplumber.open(file) as pdf:
+                    for page in pdf.pages:
+                        try:
+                            page_text = page.extract_text() or page.extract_text_simple()
+                        except Exception:
+                            page_text = None
+                        if page_text and page_text.strip():
+                            lang = detect_language(page_text)
+                            counts[lang] = counts.get(lang, 0) + 1
+            except Exception as e:
+                print(f"Language distribution PDF error: {e}")
+        elif extension in ('docx', 'txt'):
+            # Reuse existing extractors for full text detection
+            text = extract_text(file)
+            lang = detect_language(text or '')
+            counts[lang] = counts.get(lang, 0) + 1
+        else:
+            # Unsupported types handled elsewhere
+            pass
+        return counts
+    except Exception as e:
+        print(f"get_language_distribution error: {e}")
+        return {}
 
 def extract_from_docx(file) -> str:
     """Extract text from DOCX using docx2txt."""

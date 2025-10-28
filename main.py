@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 from dotenv import load_dotenv
-from utils import extract_text, detect_language, get_language_name
+from utils import extract_text, detect_language, get_language_name, get_language_distribution
 from rag_pipeline import RAGPipeline
 from llm_handler import GroqHandler
 
@@ -57,7 +57,7 @@ if not api_key_status:
 else:
     st.success("✅ **API Key Configured**: Ready to process documents!")
 
-<<<<<<< HEAD
+
 with st.sidebar:
     st.header("🔐 API Settings")
     api_key_input = st.text_input(
@@ -93,14 +93,32 @@ with st.sidebar:
     if uploaded_file is not None:
         with st.spinner("Processing document..."):
             try:
+                # Detect dominant language distribution (by pages for PDF)
+                lang_counts = get_language_distribution(uploaded_file)
                 # Extract text from uploaded file
                 text = extract_text(uploaded_file)
                 
                 if not text or len(text.strip()) < 20:
                     st.error("❌ Could not extract sufficient text from the document.")
                 else:
-                    # Detect language
+                    # Determine language to use
                     lang_code = detect_language(text)
+                    if lang_counts and len(lang_counts) > 1:
+                        # Show language distribution and prompt user
+                        st.info("Multiple languages detected in the document. Please choose a language for answers.")
+                        # Build label mapping
+                        options = []
+                        for code, count in sorted(lang_counts.items(), key=lambda x: x[1], reverse=True):
+                            options.append((code, f"{get_language_name(code)} ({count} pages)"))
+                        # Default to most frequent
+                        default_idx = 0
+                        labels = [label for _, label in options]
+                        selection = st.selectbox("Select document language", labels, index=default_idx)
+                        # Map selection back to code
+                        for code, label in options:
+                            if label == selection:
+                                lang_code = code
+                                break
                     lang_name = get_language_name(lang_code)
                     
                     st.session_state.document_language = lang_code
