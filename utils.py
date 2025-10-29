@@ -8,11 +8,7 @@ import tempfile
 import re
 import pdfplumber
 import docx2txt
-from langdetect import detect, DetectorFactory
 from typing import Optional, Dict, List, Tuple
-
-# Set seed for consistent language detection
-DetectorFactory.seed = 0
 
 # Language code mapping for South Indian languages
 LANGUAGE_MAPPING = {
@@ -20,8 +16,18 @@ LANGUAGE_MAPPING = {
     'ta': 'Tamil', 
     'te': 'Telugu',
     'kn': 'Kannada',
+    'hi': 'Hindi',
     'tcy': 'Tulu',  # Tulu language code
     'en': 'English'
+}
+
+# Unicode ranges for South Indian scripts
+UNICODE_RANGES = {
+    'hi': (0x0900, 0x097F),  # Devanagari (Hindi)
+    'ml': (0x0D00, 0x0D7F),  # Malayalam
+    'ta': (0x0B80, 0x0BFF),  # Tamil
+    'te': (0x0C00, 0x0C7F),  # Telugu
+    'kn': (0x0C80, 0x0CFF),  # Kannada
 }
 
 def extract_text(file) -> str:
@@ -133,14 +139,19 @@ def get_language_distribution(file) -> Dict[str, int]:
                             page_text = None
                         if page_text and page_text.strip():
                             lang = detect_language(page_text)
-                            counts[lang] = counts.get(lang, 0) + 1
+                            # Only count if we got a valid language
+                            if lang in LANGUAGE_MAPPING:
+                                counts[lang] = counts.get(lang, 0) + 1
             except Exception as e:
                 print(f"Language distribution PDF error: {e}")
         elif extension in ('docx', 'txt'):
             # Reuse existing extractors for full text detection
+            file.seek(0)
             text = extract_text(file)
             lang = detect_language(text or '')
-            counts[lang] = counts.get(lang, 0) + 1
+            # Only count if we got a valid language
+            if lang in LANGUAGE_MAPPING:
+                counts[lang] = counts.get(lang, 0) + 1
         else:
             # Unsupported types handled elsewhere
             pass
@@ -193,7 +204,7 @@ def detect_language(text: str) -> str:
         text: Input text to analyze
         
     Returns:
-        str: Language code (e.g., 'ml', 'ta', 'te', 'kn', 'tcy')
+        str: Language code (e.g., 'ml', 'ta', 'te', 'kn', 'tcy', 'en')
     """
     try:
         # Clean text for better detection
@@ -202,14 +213,24 @@ def detect_language(text: str) -> str:
         if len(cleaned_text.strip()) < 10:
             return 'en'  # Default to English if text is too short
         
-        detected_lang = detect(cleaned_text)
+        # First, use character-based detection for South Indian languages
+        south_indian_lang = detect_south_indian_language(cleaned_text)
         
-        # Map detected language to our supported languages
-        if detected_lang in LANGUAGE_MAPPING:
-            return detected_lang
-        else:
-            # For South Indian languages that might be misdetected
-            return detect_south_indian_language(cleaned_text)
+        if south_indian_lang != 'en':
+            return south_indian_lang
+        
+        # If no South Indian language detected, try langdetect for English
+        try:
+            from langdetect import detect
+            detected_lang = detect(cleaned_text)
+            
+            # Map detected language to our supported languages
+            if detected_lang in LANGUAGE_MAPPING:
+                return detected_lang
+        except Exception:
+            pass
+        
+        return 'en'  # Default fallback
             
     except Exception as e:
         print(f"Language detection error: {e}")
@@ -217,24 +238,42 @@ def detect_language(text: str) -> str:
 
 def detect_south_indian_language(text: str) -> str:
     """
-    Enhanced detection for South Indian languages using character patterns.
+    Enhanced detection for Indic languages using Unicode character patterns.
+    Includes Hindi (Devanagari) and major South Indian scripts.
     """
-    # Character ranges for South Indian scripts
+    if not text or len(text.strip()) == 0:
+        return 'en'
+    
+    # Count characters in each relevant script
+    hindi_chars = re.findall(r'[\u0900-\u097F]', text)       # Devanagari (Hindi)
     malayalam_chars = re.findall(r'[\u0D00-\u0D7F]', text)
     tamil_chars = re.findall(r'[\u0B80-\u0BFF]', text)
     telugu_chars = re.findall(r'[\u0C00-\u0C7F]', text)
     kannada_chars = re.findall(r'[\u0C80-\u0CFF]', text)
     
     char_counts = {
+        'hi': len(hindi_chars),
         'ml': len(malayalam_chars),
         'ta': len(tamil_chars),
         'te': len(telugu_chars),
         'kn': len(kannada_chars)
     }
     
-    # Return language with highest character count
+    # Calculate percentages to handle mixed-language texts
+    total_chars = sum(char_counts.values())
+    
+    if total_chars == 0:
+        return 'en'  # No South Indian script detected
+    
+    # If one language clearly dominates (>80% of characters)
+    for lang, count in char_counts.items():
+        if count > 0 and (count / total_chars) > 0.8:
+            return lang
+    
+    # Otherwise, return the language with the highest count
     if max(char_counts.values()) > 0:
-        return max(char_counts, key=char_counts.get)
+        max_lang = max(char_counts, key=char_counts.get)
+        return max_lang
     
     return 'en'  # Default to English
 

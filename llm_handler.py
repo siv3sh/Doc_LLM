@@ -164,6 +164,7 @@ Please provide a comprehensive answer based on ALL the provided context. Extract
     def _get_no_context_response(self, language: str) -> str:
         """Get response when no context is available."""
         responses = {
+            'hi': "क्षमा कीजिए, इस प्रश्न का उत्तर देने के लिए दस्तावेज़ में पर्याप्त जानकारी नहीं मिली।",
             'ml': "ക്ഷമിക്കണം, ഈ ചോദ്യത്തിന് ഉത്തരം നൽകാൻ ആവശ്യമായ വിവരങ്ങൾ രേഖയിൽ കണ്ടെത്താൻ കഴിഞ്ഞില്ല.",
             'ta': "மன்னிக்கவும், இந்த கேள்விக்கு பதில் அளிக்க தேவையான தகவல்களை ஆவணத்தில் காண முடியவில்லை.",
             'te': "క్షమించండి, ఈ ప్రశ్నకు సమాధానం ఇవ్వడానికి అవసరమైన సమాచారం పత్రంలో కనుగొనబడలేదు.",
@@ -171,11 +172,12 @@ Please provide a comprehensive answer based on ALL the provided context. Extract
             'tcy': "ಕ್ಷಮಿಸಿ, ಈ ಪ್ರಶ್ನೆಗೆ ಉತ್ತರ ನೀಡಲು ಅಗತ್ಯವಾದ ಮಾಹಿತಿಯನ್ನು ದಾಖಲೆಯಲ್ಲಿ ಕಂಡುಹಿಡಿಯಲಾಗಲಿಲ್ಲ.",
             'en': "Sorry, I couldn't find sufficient information in the document to answer this question."
         }
-        return responses.get(language, responses['en'])
+        return responses.get(language, responses.get(language, responses['en']))
     
     def _get_error_response(self, language: str) -> str:
         """Get response when there's an error."""
         responses = {
+            'hi': "क्षमा कीजिए, उत्तर बनाने में त्रुटि हुई। कृपया फिर से प्रयास करें।",
             'ml': "ക്ഷമിക്കണം, ഉത്തരം സൃഷ്ടിക്കുന്നതിൽ ഒരു പിശക് സംഭവിച്ചു. ദയവായി വീണ്ടും ശ്രമിക്കുക.",
             'ta': "மன்னிக்கவும், பதிலை உருவாக்குவதில் பிழை ஏற்பட்டது. தயவுசெய்து மீண்டும் முயற்சிக்கவும்.",
             'te': "క్షమించండి, సమాధానాన్ని సృష్టించడంలో లోపం సంభవించింది. దయచేసి మళ్లీ ప్రయత్నించండి.",
@@ -183,7 +185,7 @@ Please provide a comprehensive answer based on ALL the provided context. Extract
             'tcy': "ಕ್ಷಮಿಸಿ, ಉತ್ತರವನ್ನು ರಚಿಸುವಲ್ಲಿ ದೋಷ ಸಂಭವಿಸಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
             'en': "Sorry, there was an error generating the response. Please try again."
         }
-        return responses.get(language, responses['en'])
+        return responses.get(language, responses.get(language, responses['en']))
     
     def test_connection(self) -> bool:
         """

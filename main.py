@@ -196,7 +196,8 @@ else:
                     # Retrieve relevant context
                     context_chunks = st.session_state.rag_pipeline.retrieve_context(
                         query=prompt,
-                        top_k=5
+                        top_k=5,
+                        language=st.session_state.document_language
                     )
                     
                     # Generate answer using Groq
