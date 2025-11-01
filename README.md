@@ -5,7 +5,8 @@ A production-grade Streamlit application that enables users to upload documents 
 ## ✨ Features
 
 - **Multilingual Support**: Automatically detects and processes documents in Malayalam, Tamil, Telugu, Kannada, and Tulu
-- **Document Processing**: Supports PDF, DOCX, and TXT file formats
+- **Document Processing**: Supports PDF, DOCX, TXT, and **Image files** (JPG, PNG, BMP, GIF, TIFF)
+- **OCR Support**: Extracts text from images and scanned documents using Tesseract OCR with Indic language support
 - **Advanced RAG Pipeline**: Uses sentence-transformers for multilingual embeddings and Qdrant for vector storage
 - **Groq LLM Integration**: Powered by state-of-the-art models like Mixtral-8x7B and Llama3-70B
 - **Language-Aware Responses**: Always responds in the same language as the uploaded document
@@ -61,6 +62,7 @@ graph TD
 - Python 3.8 or higher
 - Groq API key (get from [Groq Console](https://console.groq.com/keys))
 - Qdrant instance (local or cloud)
+- **Tesseract OCR** (required for image and scanned document processing)
 
 ## 🚀 Quick Start
 
@@ -76,6 +78,25 @@ cd doc_llm
 ```bash
 pip install -r requirements.txt
 ```
+
+### 2.1. Install Tesseract OCR (for image support)
+
+**macOS:**
+```bash
+brew install tesseract tesseract-lang
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get update
+sudo apt-get install tesseract-ocr tesseract-ocr-eng tesseract-ocr-hin \
+  tesseract-ocr-mal tesseract-ocr-tam tesseract-ocr-tel tesseract-ocr-kan
+```
+
+**Windows:**
+- Download installer from: https://github.com/UB-Mannheim/tesseract/wiki
+- Add Tesseract to your system PATH
+- Install language packs during installation
 
 ### 3. Setup Qdrant
 
@@ -152,13 +173,19 @@ doc_llm/
 ### Malayalam Document
 1. Upload a Malayalam PDF: `കേരള ടൂറിസം 2025.pdf`
 2. System detects: Malayalam
-3. Ask: "കേരള ടൂറിസം നയത്തിന്റെ പ്രധാന ലക്ഷ്യങ്ങൾ എന്തൊക്കെയാണു?"
+3. Ask: "കേരള ടൂറിസം നയത്തിന്റെ പ്രധാന ലക്ഷ്യങ്ങള്‍ എന്തൊക്കെയാണു?"
 4. Get response in Malayalam
 
 ### Tamil Document
 1. Upload: `தமிழ் இலக்கிய வரலாறு.docx`
 2. Ask: "திருக்குறளின் ஆசிரியர் யார்?"
 3. Get response in Tamil
+
+### Image/Scanned Document
+1. Upload: `telugu_notice.jpg` or `kannada_article.png`
+2. System uses OCR to extract text and detects language
+3. Ask questions in the detected language
+4. Get responses in the same language
 
 ## 🛠️ Technical Details
 
@@ -168,9 +195,13 @@ doc_llm/
 - Fallback to English for unsupported languages
 
 ### Text Processing
-- **PDF**: Uses `pdfplumber` for reliable text extraction
+- **PDF**: Uses `pdfplumber` for reliable text extraction, with OCR fallback for scanned PDFs
 - **DOCX**: Uses `docx2txt` for Word document processing
 - **TXT**: Supports multiple encodings (UTF-8, UTF-16, Latin-1)
+- **Images**: Uses Tesseract OCR with multilingual support (eng, hin, mal, tam, tel, kan)
+  - Supports: JPG, JPEG, PNG, BMP, GIF, TIFF
+  - Automatic image format conversion and preprocessing
+  - Enhanced OCR configuration for better accuracy
 
 ### Embeddings
 - Model: `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`
@@ -201,23 +232,46 @@ doc_llm/
      ```
    - **Verify**: Check that `.env` file exists and contains `GROQ_API_KEY=your_actual_key`
 
-2. **"ModuleNotFoundError: No module named 'utils'"**
+2. **"OCR dependencies missing"** ❌
+   - **Solution**: Install Tesseract OCR and Python packages
+   - **Steps**:
+     ```bash
+     # macOS
+     brew install tesseract tesseract-lang
+     
+     # Ubuntu/Debian
+     sudo apt-get install tesseract-ocr tesseract-ocr-eng tesseract-ocr-hin \
+       tesseract-ocr-mal tesseract-ocr-tam tesseract-ocr-tel tesseract-ocr-kan
+     
+     # Python packages (should already be in requirements.txt)
+     pip install pytesseract Pillow pdf2image
+     ```
+
+3. **"ModuleNotFoundError: No module named 'utils'"**
    - Ensure all files are in the same directory
    - Check Python path
 
-3. **"Connection to Qdrant failed"**
+4. **"Connection to Qdrant failed"**
    - Ensure Qdrant is running on the specified URL
    - Check firewall settings
    - **Note**: App will automatically use in-memory storage if Qdrant is unavailable
 
-4. **"Language detection failed"**
+5. **"Language detection failed"**
    - Ensure document has sufficient text (>20 characters)
    - Check if language is supported
 
-5. **"Could not extract sufficient text from the document"**
+6. **"Could not extract sufficient text from the document"**
    - Try a different PDF format
    - Ensure the PDF contains readable text (not just images)
+   - For scanned PDFs or images, ensure Tesseract OCR is properly installed
    - Check if the document is corrupted
+   - For images: ensure the text is clear and high-resolution
+
+7. **"Could not extract sufficient text from image"**
+   - Ensure the image has good quality and resolution (300 DPI or higher recommended)
+   - Check if the text is clearly visible and not blurred
+   - Verify Tesseract language packs are installed for the document language
+   - Try preprocessing the image (increase contrast, convert to grayscale)
 
 ### Performance Optimization
 

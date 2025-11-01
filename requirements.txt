@@ -27,3 +27,8 @@ nltk>=3.8.1
 
 # Optional: For better text processing
 indic-nlp-library>=0.81
+
+# OCR (for image-based PDFs)
+pytesseract>=0.3.10
+pdf2image>=1.17.0
+Pillow>=10.0.0

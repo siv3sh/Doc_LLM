@@ -49,6 +49,8 @@ def extract_text(file) -> str:
             return extract_from_docx(file)
         elif file_extension == 'txt':
             return extract_from_txt(file)
+        elif file_extension in ['jpg', 'jpeg', 'png', 'bmp', 'gif', 'tiff', 'tif']:
+            return extract_from_image(file)
         else:
             raise ValueError(f"Unsupported file type: {file_extension}")
     except Exception as e:
@@ -96,6 +98,15 @@ def extract_from_pdf(file) -> str:
                     except Exception:
                         continue
         
+        # If still empty, fallback to OCR for image-based PDFs
+        if not text_content:
+            try:
+                ocr_text = ocr_pdf(file)
+                if ocr_text and ocr_text.strip():
+                    return ocr_text
+            except Exception as ocr_err:
+                print(f"OCR fallback failed: {ocr_err}")
+        
         return '\n'.join(text_content)
     
     except Exception as e:
@@ -110,10 +121,74 @@ def extract_from_pdf(file) -> str:
                 page_text = page.extract_text()
                 if page_text and page_text.strip():
                     text_content.append(page_text.strip())
-            return '\n'.join(text_content)
+            if text_content:
+                return '\n'.join(text_content)
+            # If PyPDF2 also failed to get text, try OCR
+            ocr_text = ocr_pdf(file)
+            return ocr_text
         except Exception as e2:
             print(f"Alternative PDF extraction also failed: {e2}")
             raise Exception(f"Could not extract text from PDF: {e}")
+
+def ocr_pdf(file) -> str:
+    """OCR fallback: render PDF pages to images and extract text via Tesseract.
+    Requires poppler (for pdf2image) and Tesseract installed on system.
+    """
+    try:
+        from pdf2image import convert_from_bytes
+        import pytesseract
+        from PIL import Image
+    except Exception as import_err:
+        raise Exception(
+            "OCR dependencies missing. Please install system packages and pip deps: "
+            "poppler (system), tesseract-ocr (system), and pip install pdf2image pytesseract pillow"
+        ) from import_err
+
+    # Read file bytes for conversion
+    try:
+        file.seek(0)
+        pdf_bytes = file.read()
+    except Exception:
+        # Some uploaders require getbuffer
+        try:
+            file.seek(0)
+            pdf_bytes = file.getbuffer().tobytes()  # type: ignore[attr-defined]
+        except Exception as e:
+            raise Exception(f"Failed to read PDF bytes for OCR: {e}")
+
+    # Convert PDF to images
+    try:
+        images = convert_from_bytes(pdf_bytes, dpi=300)
+    except Exception as conv_err:
+        raise Exception(
+            "Failed to render PDF pages for OCR. Ensure poppler is installed and available in PATH."
+        ) from conv_err
+
+    # Configure Tesseract language set; include Indic scripts
+    tesseract_langs = 'eng+hin+mal+tam+tel+kan'
+    ocr_texts: List[str] = []
+    for idx, img in enumerate(images):
+        try:
+            text = pytesseract.image_to_string(img, lang=tesseract_langs)
+            if text and text.strip():
+                ocr_texts.append(text.strip())
+        except Exception as ocr_page_err:
+            print(f"Multilingual OCR failed on page {idx+1}, trying English: {ocr_page_err}")
+            # Fallback to English-only OCR
+            try:
+                text = pytesseract.image_to_string(img, lang='eng')
+                if text and text.strip():
+                    ocr_texts.append(text.strip())
+            except Exception as eng_err:
+                print(f"English OCR also failed on page {idx+1}: {eng_err}")
+                # Try basic OCR without language specification
+                try:
+                    text = pytesseract.image_to_string(img)
+                    if text and text.strip():
+                        ocr_texts.append(text.strip())
+                except Exception:
+                    continue  # Skip this page if all methods fail
+    return '\n\n'.join(ocr_texts) if ocr_texts else ""
 
 def get_language_distribution(file) -> Dict[str, int]:
     """Compute language distribution in a document. For PDFs, detects per-page languages.
@@ -144,7 +219,7 @@ def get_language_distribution(file) -> Dict[str, int]:
                                 counts[lang] = counts.get(lang, 0) + 1
             except Exception as e:
                 print(f"Language distribution PDF error: {e}")
-        elif extension in ('docx', 'txt'):
+        elif extension in ('docx', 'txt', 'jpg', 'jpeg', 'png', 'bmp', 'gif', 'tiff', 'tif'):
             # Reuse existing extractors for full text detection
             file.seek(0)
             text = extract_text(file)
@@ -196,6 +271,77 @@ def extract_from_txt(file) -> str:
     
     raise Exception("Could not decode text file with any supported encoding")
 
+def extract_from_image(file) -> str:
+    """Extract text from image files using OCR (Tesseract).
+    Supports multilingual text extraction including Indic scripts.
+    
+    Args:
+        file: Streamlit uploaded file object (image)
+        
+    Returns:
+        str: Extracted text from the image
+    """
+    try:
+        from PIL import Image
+        import pytesseract
+    except ImportError as import_err:
+        raise Exception(
+            "OCR dependencies missing. Please install: pip install Pillow pytesseract\n"
+            "System requirement: Install tesseract-ocr\n"
+            "  - macOS: brew install tesseract tesseract-lang\n"
+            "  - Ubuntu/Debian: apt-get install tesseract-ocr tesseract-ocr-eng tesseract-ocr-hin "
+            "tesseract-ocr-mal tesseract-ocr-tam tesseract-ocr-tel tesseract-ocr-kan\n"
+            "  - Windows: Download from https://github.com/UB-Mannheim/tesseract/wiki"
+        ) from import_err
+    
+    try:
+        # Reset file pointer
+        file.seek(0)
+        
+        # Open image using PIL
+        image = Image.open(file)
+        
+        # Convert to RGB if necessary (handles RGBA, grayscale, etc.)
+        if image.mode not in ('RGB', 'L'):
+            image = image.convert('RGB')
+        
+        # Configure Tesseract with support for multiple Indian languages
+        # Languages: English, Hindi, Malayalam, Tamil, Telugu, Kannada
+        tesseract_langs = 'eng+hin+mal+tam+tel+kan'
+        
+        # Perform OCR with enhanced configuration for better accuracy
+        custom_config = r'--oem 3 --psm 6'  # OEM 3 = Default, PSM 6 = Assume uniform block of text
+        
+        try:
+            text = pytesseract.image_to_string(
+                image,
+                lang=tesseract_langs,
+                config=custom_config
+            )
+        except Exception as tesseract_err:
+            # Fallback: try with English only if multilingual fails
+            print(f"Multilingual OCR failed, trying English only: {tesseract_err}")
+            try:
+                text = pytesseract.image_to_string(image, lang='eng', config=custom_config)
+            except Exception as eng_err:
+                # Last resort: try without any config
+                print(f"English OCR failed, trying basic extraction: {eng_err}")
+                try:
+                    text = pytesseract.image_to_string(image)
+                except Exception:
+                    text = ""  # Return empty rather than fail
+        
+        # Return whatever text was extracted, even if minimal
+        if not text:
+            text = ""  # Return empty string instead of raising error
+        
+        return text.strip()
+        
+    except Exception as e:
+        if "extract_from_image" in str(e) or "OCR dependencies" in str(e):
+            raise
+        raise Exception(f"Error processing image: {str(e)}")
+
 def detect_language(text: str) -> str:
     """
     Detect language of the input text.
@@ -210,8 +356,9 @@ def detect_language(text: str) -> str:
         # Clean text for better detection
         cleaned_text = clean_text_for_detection(text)
         
-        if len(cleaned_text.strip()) < 10:
-            return 'en'  # Default to English if text is too short
+        # Process any length of text - no minimum requirement
+        if len(cleaned_text.strip()) == 0:
+            return 'en'  # Default to English if text is empty
         
         # First, use character-based detection for South Indian languages
         south_indian_lang = detect_south_indian_language(cleaned_text)
@@ -368,15 +515,16 @@ def chunk_text(text: str, chunk_size: int = 800, overlap: int = 100) -> List[str
     
     return chunks
 
-def validate_text_length(text: str, min_length: int = 20) -> bool:
+def validate_text_length(text: str, min_length: int = 0) -> bool:
     """
     Validate if extracted text meets minimum length requirements.
+    Now accepts any text - always returns True unless completely empty.
     
     Args:
         text: Extracted text
-        min_length: Minimum required length
+        min_length: Minimum required length (default 0 - accepts anything)
         
     Returns:
-        bool: True if text is valid, False otherwise
+        bool: True if text has any content, False only if completely empty
     """
-    return len(text.strip()) >= min_length
+    return text is not None and len(text.strip()) >= min_length

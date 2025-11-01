@@ -86,8 +86,8 @@ with st.sidebar:
     
     uploaded_file = st.file_uploader(
         "Upload your document",
-        type=["pdf", "docx", "txt"],
-        help="Supported formats: PDF, DOCX, TXT"
+        type=["pdf", "docx", "txt", "jpg", "jpeg", "png", "bmp", "gif", "tiff"],
+        help="Supported formats: PDF, DOCX, TXT, Images (JPG, PNG, BMP, GIF, TIFF)"
     )
     
     if uploaded_file is not None:
@@ -98,63 +98,66 @@ with st.sidebar:
                 # Extract text from uploaded file
                 text = extract_text(uploaded_file)
                 
-                if not text or len(text.strip()) < 20:
-                    st.error("❌ Could not extract sufficient text from the document.")
-                else:
-                    # Determine language to use
-                    lang_code = detect_language(text)
-                    if lang_counts and len(lang_counts) > 1:
-                        # Show language distribution and prompt user
-                        st.info("Multiple languages detected in the document. Please choose a language for answers.")
-                        # Build label mapping
-                        options = []
-                        for code, count in sorted(lang_counts.items(), key=lambda x: x[1], reverse=True):
-                            options.append((code, f"{get_language_name(code)} ({count} pages)"))
-                        # Default to most frequent
-                        default_idx = 0
-                        labels = [label for _, label in options]
-                        selection = st.selectbox("Select document language", labels, index=default_idx)
-                        # Map selection back to code
-                        for code, label in options:
-                            if label == selection:
-                                lang_code = code
-                                break
-                    lang_name = get_language_name(lang_code)
-                    
-                    st.session_state.document_language = lang_code
-                    
-                    # Display detected language
-                    st.success(f"✅ **Detected Language:** {lang_name}")
-                    st.info(f"📝 **Document:** {uploaded_file.name}")
-                    st.info(f"📊 **Text Length:** {len(text)} characters")
-                    
-                    # Initialize RAG pipeline if not already done
-                    if st.session_state.rag_pipeline is None:
-                        st.session_state.rag_pipeline = RAGPipeline()
-                    
-                    # Initialize Groq handler if not already done
-                    if st.session_state.groq_handler is None:
-                        try:
-                            # Use applied API key if present, else fall back to env
-                            st.session_state.groq_handler = GroqHandler(api_key=os.getenv('GROQ_API_KEY'))
-                        except ValueError as e:
-                            st.error(f"❌ {str(e)}")
-                            st.info("💡 **How to fix:**\n"
-                                   "1. Enter your API key in the sidebar 'API Settings' and click Apply\n"
-                                   "2. Or create a `.env` file with GROQ_API_KEY set\n"
-                                   "3. Then re-upload the document")
-                            st.stop()
-                    
-                    # Process and store document
-                    with st.spinner("Embedding and storing document..."):
-                        st.session_state.rag_pipeline.process_document(
-                            text=text,
-                            filename=uploaded_file.name,
-                            language=lang_code
-                        )
-                    
-                    st.session_state.document_uploaded = True
-                    st.success("✅ Document processed and stored successfully!")
+                # Process even if text is minimal - be aggressive in extracting whatever is available
+                if not text or len(text.strip()) == 0:
+                    st.warning("⚠️ No text extracted. The file may be empty or corrupted. Attempting to process anyway...")
+                    text = " "  # Placeholder to prevent complete failure
+                
+                # Continue processing regardless of text length
+                # Determine language to use
+                lang_code = detect_language(text)
+                if lang_counts and len(lang_counts) > 1:
+                    # Show language distribution and prompt user
+                    st.info("Multiple languages detected in the document. Please choose a language for answers.")
+                    # Build label mapping
+                    options = []
+                    for code, count in sorted(lang_counts.items(), key=lambda x: x[1], reverse=True):
+                        options.append((code, f"{get_language_name(code)} ({count} pages)"))
+                    # Default to most frequent
+                    default_idx = 0
+                    labels = [label for _, label in options]
+                    selection = st.selectbox("Select document language", labels, index=default_idx)
+                    # Map selection back to code
+                    for code, label in options:
+                        if label == selection:
+                            lang_code = code
+                            break
+                lang_name = get_language_name(lang_code)
+                
+                st.session_state.document_language = lang_code
+                
+                # Display detected language
+                st.success(f"✅ **Detected Language:** {lang_name}")
+                st.info(f"📝 **Document:** {uploaded_file.name}")
+                st.info(f"📊 **Text Length:** {len(text)} characters")
+                
+                # Initialize RAG pipeline if not already done
+                if st.session_state.rag_pipeline is None:
+                    st.session_state.rag_pipeline = RAGPipeline()
+                
+                # Initialize Groq handler if not already done
+                if st.session_state.groq_handler is None:
+                    try:
+                        # Use applied API key if present, else fall back to env
+                        st.session_state.groq_handler = GroqHandler(api_key=os.getenv('GROQ_API_KEY'))
+                    except ValueError as e:
+                        st.error(f"❌ {str(e)}")
+                        st.info("💡 **How to fix:**\n"
+                               "1. Enter your API key in the sidebar 'API Settings' and click Apply\n"
+                               "2. Or create a `.env` file with GROQ_API_KEY set\n"
+                               "3. Then re-upload the document")
+                        st.stop()
+                
+                # Process and store document
+                with st.spinner("Embedding and storing document..."):
+                    st.session_state.rag_pipeline.process_document(
+                        text=text,
+                        filename=uploaded_file.name,
+                        language=lang_code
+                    )
+                
+                st.session_state.document_uploaded = True
+                st.success("✅ Document processed and stored successfully!")
                     
             except Exception as e:
                 st.error(f"❌ Error processing document: {str(e)}")

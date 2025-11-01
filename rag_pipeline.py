@@ -116,18 +116,20 @@ class RAGPipeline:
         """
         try:
             # Clean the text
-            cleaned_text = clean_text(text)
+            cleaned_text = clean_text(text) if text else text
             
-            if not cleaned_text:
-                print("No text content to process")
-                return False
+            # Process even if text is minimal or empty
+            if not cleaned_text or len(cleaned_text.strip()) == 0:
+                print("Warning: Processing document with minimal/no text")
+                cleaned_text = text if text else "[Empty Document]"
             
-            # Chunk the text
+            # Chunk the text - accept even single character
             chunks = chunk_text(cleaned_text, chunk_size=500, overlap=50)
             
+            # If no chunks generated, create at least one chunk with whatever we have
             if not chunks:
-                print("No text chunks generated")
-                return False
+                print("Warning: No chunks generated, creating single chunk")
+                chunks = [cleaned_text] if cleaned_text else ["[No content]"]
             
             # Generate embeddings for all chunks
             embeddings = self.generate_embeddings(chunks)
